@@ -2,17 +2,30 @@
 var through = require('through')
 var binarysearch = require('binarysearch')
 
-module.exports = function(comparitor,streams){
-  var t = through()
+module.exports = function(comparitor,streams,opts){
+  var t = through(function(data){
+    if(opts.unique) {
+      if(last && comparitor(last,data) != 0) this.queue(last);
+      last = data;
+    } else {
+      this.queue(data);
+    }
+  },function(){
+    if(last) this.queue(last);
+    this.queue(null);
+  })
   , active = streams.length
   , check = {}
   , drain = 0
   , buf = []
   , paused = {}
   , ended = {}
+  , last
 
-  t.highWaterMark = 1;
-  t.lowWaterMark = 0;
+  opts = opts||{};
+
+  t.highWaterMark = opts.highWaterMark||1;
+  t.lowWaterMark = opts.lowWaterMark||0;
 
   streams.forEach(function(s,id){
     
@@ -55,7 +68,7 @@ module.exports = function(comparitor,streams){
     while(drain >= active && buf.length) {
       var toWrite = buf.shift()
       check[toWrite[0]]--
-      t.queue(toWrite[1])
+      t.write(toWrite[1])
 
       if(!check[toWrite[0]]) {
         if(ended[toWrite[0]] == 1) {
