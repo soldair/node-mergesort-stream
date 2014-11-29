@@ -1,78 +1,110 @@
-// mergesortstream
-var through = require('through')
-var binarysearch = require('binarysearch')
+
+var through = require('through2');
+var bs = require('binarysearch')
+var Readable = require("readable-stream");
+
 
 module.exports = function(comparitor,streams){
-  var t = through()
-  , active = streams.length
-  , check = {}
-  , drain = 0
-  , buf = []
-  , paused = {}
-  , ended = {}
 
-  t.highWaterMark = 1;
-  t.lowWaterMark = 0;
+  var events = [];
+  var pending = 0;
+  var active = streams.length;
 
-  streams.forEach(function(s,id){
-    
-    s.on('data',function(data){
-      binarysearch.insert(buf,[id,data],function(d1,d2){
-        return comparitor(d1[1],d2[1]);
-      })
+  // every time the buffer has one event for each stream.
+  // send the lowest value.
+  // attempt to read another form the stream that just provoded the value.
+  // repeat
 
-      if(!check[id]) {
-        check[id] = 0
-        drain++;
-      }
-      check[id]++;
+  var check = [];
+  var ready = 0;
 
-      // if i have already buffered extra data events for this stream lets pause
-      if(!write() && check[id] > t.highWaterMark){
-        s.pause()
-        paused[id] = 1;
-      }
-    }).on('end',function(){
-      if(!check[id]) active--;
-      else ended[id] = 1;
-      write();
-    }).on('drain',function(){ 
-      paused[id] = 0;
-    })
+  var buf = [];
 
-  })
+  var out = through.obj(function(chunk,enc,cb){
+    this.push(chunk);
+    cb();
+  });
 
-  t.on('drain',function(){
-    write();
-    var pauses = Object.keys(paused);
-    while(pauses.length) {
-      streams[pauses[0]].resume()
-      delete paused[pauses.shift()]
+  var send = function(){
+    if(buf.length >= active && buf.length){
+      // one event for each stream.
+      var d = buf.shift();
+      check[d[0]] = 0;
+      ready--;
+      out.write(d[1]);
+      return d[0];
     }
-  })
-
-  function write(){
-    while(drain >= active && buf.length) {
-      var toWrite = buf.shift()
-      check[toWrite[0]]--
-      t.queue(toWrite[1])
-
-      if(!check[toWrite[0]]) {
-        if(ended[toWrite[0]] == 1) {
-          active--;
-          delete ended[toWrite[0]];
-        }
-        drain--;
-      }
-
-      if(check[toWrite[0]] <= t.lowWaterMark && paused[toWrite[0]]) {
-        streams[toWrite[0]].resume()
-      }
-    }
-
-    if(!active && !drain) t.end();
-    return t.paused;
+    return false;
   }
 
-  return t;
+  cmp = function(d1,d2){
+    return comparitor(d1[1],d2[1]);
+  }
+
+  var read = function(id){
+
+    // already have data buffered for this stream.
+    if(check[id]){
+      //console.log('already have data id:',id,' ',active,buf.length,' 0:',buf);
+      return false;
+    }
+
+    var working = true,read;
+    while((data = streams[id].read())){
+      //console.log('read data!');
+      check[id] = 1;
+
+      bs.insert(buf,[id,data],cmp);
+
+      ready++;
+      if(ready < active) {
+        //console.log('not all stream have had a readable event');
+        break;
+      }
+
+      id = send();
+
+      //console.log('sent data ', id);
+      if(id === false) break;
+    }
+  }
+
+  streams.forEach(function(stream,id){
+    // streams1 support.
+    if(!stream.read) {
+      stream = (new Readable).wrap(stream);
+      streams[id] = stream;
+    }
+
+    stream.on('readable',function(c){
+      //console.log('readable!',id);
+      read(id); 
+    }).on('end',function(){
+      active--;
+
+      // if i end i have no more data events to send.
+      // the other streams may be waiting for my read to continue.
+      // i have to send the next value.
+      if(active) {
+        var id = send();
+        if(id) read(id);
+      } else {
+        out.end();
+      }
+    });
+
+    //a readable event happened before the call too ms make sure i start pulling data right away.
+    read(id);
+
+  });
+
+  return out
+
 }
+
+
+
+
+
+
+

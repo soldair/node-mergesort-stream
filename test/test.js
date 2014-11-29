@@ -1,18 +1,18 @@
 var test = require('tape');
 var mergey = require('../');
-var through = require('through')
+var through = require('through2')
 
-test("can merge streams stream 2 end empty",function(t){
-  var t1 = through()
-  var t2 = through()
+test("can merge streams streams 2 end empty",function(t){
+  var t1 = through.obj()
+  var t2 = through.obj();
 
   var s = mergey(function(data1,data2){
     if(data1 > data2) return 1
     else if(data1 < data2) return -1
     return 0
-  },[t1,t2])
+  },[t1,t2]);
 
-  var a = []
+  var a = [];
 
   s.on('data',a.push.bind(a)).on('end',function(){
     t.ok(1,'end should be called')

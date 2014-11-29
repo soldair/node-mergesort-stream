@@ -1,7 +1,7 @@
 {
   "name": "mergesort-stream",
   "description": "merge sorted data from multiple streams into one",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "repository": {
     "url": "git://github.com/soldair/node-mergesort-stream.git"
   },
@@ -11,10 +11,12 @@
   },
   "author": "Ryan Day",
   "dependencies": {
-    "through": "~2.3.4",
-    "binarysearch": "~0.2.4"
+    "binarysearch": "~0.2.4",
+    "readable-stream": "1.0.x",
+    "through2": "^0.6.3"
   },
   "devDependencies": {
-    "tape": "~1.0.4"
+    "tape": "~1.0.4",
+    "through": "~2.3.4"
   }
 }

@@ -2,7 +2,7 @@ var test = require('tape');
 var mergey = require('../');
 var through = require('through')
 
-test("can merge streams stream 2 end early",function(t){
+test("can use streams 1 streams",function(t){
   var t1 = through()
   var t2 = through()
 
