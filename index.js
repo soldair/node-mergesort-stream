@@ -4,15 +4,17 @@ var bs = require('binarysearch')
 var Readable = require("readable-stream");
 
 
-module.exports = function(comparitor,streams){
+module.exports = function(comparitor,streams,options){
+
+  options = options||{};
 
   var events = [];
   var pending = 0;
   var active = streams.length;
 
-  // every time the buffer has one event for each stream.
+  // each time the buffer has one event for each stream.
   // send the lowest value.
-  // attempt to read another form the stream that just provoded the value.
+  // attempt to read another form the stream that just provided the value.
   // repeat
 
   var check = [];
@@ -37,7 +39,7 @@ module.exports = function(comparitor,streams){
     return false;
   }
 
-  cmp = function(d1,d2){
+  var cmp = function(d1,d2){
     return comparitor(d1[1],d2[1]);
   }
 
@@ -72,7 +74,7 @@ module.exports = function(comparitor,streams){
   streams.forEach(function(stream,id){
     // streams1 support.
     if(!stream.read) {
-      stream = (new Readable).wrap(stream);
+      stream = (new Readable({objectMode:true,highWaterMark:options.highWaterMark||500,lowWaterMark:options.lowWaterMark||20})).wrap(stream);
       streams[id] = stream;
     }
 
